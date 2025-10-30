@@ -1,0 +1,13 @@
+{
+  "functions": {
+    "api/get-crypto-data.py": {
+      "runtime": "python3.9"
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/get-crypto-data",
+      "dest": "api/get-crypto-data.py"
+    }
+  ]
+}
