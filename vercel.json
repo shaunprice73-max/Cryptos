@@ -8,6 +8,11 @@
     {
       "src": "/api/get-crypto-data",
       "dest": "api/get-crypto-data.py"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ]
 }
+
