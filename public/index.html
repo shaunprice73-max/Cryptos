@@ -53,9 +53,10 @@
         .status {
             margin-top: 15px;
             font-weight: bold;
-            padding: 5px;
+            padding: 8px;
             border-radius: 4px;
             text-align: center;
+            font-size: 0.9em;
         }
 
         .status.ready {
@@ -78,7 +79,7 @@
 
         .chart-container {
             position: relative;
-            height: 350px;
+            height: 250px;
             width: 100%;
             margin-top: 15px;
         }
@@ -94,6 +95,11 @@
             font-size: 0.9em;
             color: #666;
         }
+
+        .data-row {
+            margin: 8px 0;
+            font-size: 0.95em;
+        }
     </style>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 </head>
@@ -105,9 +111,9 @@
         <div class="card-container">
             <div class="crypto-card" id="XRP">
                 <h2>XRP</h2>
-                <p>Price: <span class="price">...</span></p>
-                <p>RSI (90-Day): <span class="rsi">...</span></p>
-                <p>Correction: <span class="correction">...</span></p>
+                <div class="data-row">Price: <span class="price">...</span></div>
+                <div class="data-row">RSI (90-Day): <span class="rsi">...</span></div>
+                <div class="data-row">Correction: <span class="correction">...</span></div>
                 <div class="status-box"><span class="status">Checking...</span></div>
                 <div class="chart-container">
                     <canvas id="chart-XRP"></canvas>
@@ -116,9 +122,9 @@
             
             <div class="crypto-card" id="UNI">
                 <h2>Uniswap (UNI)</h2>
-                <p>Price: <span class="price">...</span></p>
-                <p>RSI (90-Day): <span class="rsi">...</span></p>
-                <p>Correction: <span class="correction">...</span></p>
+                <div class="data-row">Price: <span class="price">...</span></div>
+                <div class="data-row">RSI (90-Day): <span class="rsi">...</span></div>
+                <div class="data-row">Correction: <span class="correction">...</span></div>
                 <div class="status-box"><span class="status">Checking...</span></div>
                 <div class="chart-container">
                     <canvas id="chart-UNI"></canvas>
@@ -127,9 +133,9 @@
             
             <div class="crypto-card" id="SOL">
                 <h2>Solana (SOL)</h2>
-                <p>Price: <span class="price">...</span></p>
-                <p>RSI (90-Day): <span class="rsi">...</span></p>
-                <p>Correction: <span class="correction">...</span></p>
+                <div class="data-row">Price: <span class="price">...</span></div>
+                <div class="data-row">RSI (90-Day): <span class="rsi">...</span></div>
+                <div class="data-row">Correction: <span class="correction">...</span></div>
                 <div class="status-box"><span class="status">Checking...</span></div>
                 <div class="chart-container">
                     <canvas id="chart-SOL"></canvas>
@@ -138,9 +144,9 @@
             
             <div class="crypto-card" id="LINK">
                 <h2>Chainlink (LINK)</h2>
-                <p>Price: <span class="price">...</span></p>
-                <p>RSI (90-Day): <span class="rsi">...</span></p>
-                <p>Correction: <span class="correction">...</span></p>
+                <div class="data-row">Price: <span class="price">...</span></div>
+                <div class="data-row">RSI (90-Day): <span class="rsi">...</span></div>
+                <div class="data-row">Correction: <span class="correction">...</span></div>
                 <div class="status-box"><span class="status">Checking...</span></div>
                 <div class="chart-container">
                     <canvas id="chart-LINK"></canvas>
@@ -155,73 +161,142 @@
     </div>
     
     <script>
-        const coins = ['XRP', 'UNI', 'SOL', 'LINK'];
+        const coins = {
+            'XRP': 'ripple',
+            'UNI': 'uniswap',
+            'SOL': 'solana',
+            'LINK': 'chainlink'
+        };
+        
         const charts = {};
+
+        // Calculate RSI
+        function calculateRSI(prices, period = 14) {
+            if (prices.length < period + 1) return null;
+            
+            let gains = 0, losses = 0;
+            for (let i = 1; i <= period; i++) {
+                const change = prices[i] - prices[i - 1];
+                if (change > 0) gains += change;
+                else losses += Math.abs(change);
+            }
+            
+            let avgGain = gains / period;
+            let avgLoss = losses / period;
+            
+            for (let i = period + 1; i < prices.length; i++) {
+                const change = prices[i] - prices[i - 1];
+                if (change > 0) {
+                    avgGain = (avgGain * (period - 1) + change) / period;
+                    avgLoss = (avgLoss * (period - 1)) / period;
+                } else {
+                    avgGain = (avgGain * (period - 1)) / period;
+                    avgLoss = (avgLoss * (period - 1) + Math.abs(change)) / period;
+                }
+            }
+            
+            const rs = avgGain / avgLoss;
+            const rsi = 100 - (100 / (1 + rs));
+            return rsi;
+        }
 
         async function fetchCryptoData() {
             try {
-                const response = await fetch('/api/get-crypto-data');
-                const data = await response.json();
-                updateDashboard(data);
+                const coinIds = Object.values(coins).join(',');
+                const response = await fetch(
+                    `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinIds}&order=market_cap_desc&per_page=250&sparkline=false`
+                );
+                const marketData = await response.json();
+                
+                // Fetch 90-day historical data for each coin
+                const dataPromises = Object.entries(coins).map(async ([symbol, id]) => {
+                    const histResponse = await fetch(
+                        `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=90`
+                    );
+                    const histData = await histResponse.json();
+                    const prices = histData.prices.map(p => p[1]);
+                    
+                    // Find current price from market data
+                    const current = marketData.find(m => m.id === id);
+                    const currentPrice = current.current_price;
+                    
+                    // Calculate 90-day peak
+                    const peak = Math.max(...prices);
+                    const correctionPercent = ((peak - currentPrice) / peak) * 100;
+                    
+                    // Calculate 90-day RSI
+                    const rsi90 = calculateRSI(prices, 14);
+                    
+                    return {
+                        symbol,
+                        currentPrice,
+                        peak,
+                        correctionPercent,
+                        rsi90,
+                        prices
+                    };
+                });
+                
+                const allData = await Promise.all(dataPromises);
+                updateDashboard(allData);
+                
             } catch (error) {
                 console.error('Error fetching crypto data:', error);
                 setTimeout(fetchCryptoData, 120000); // Retry after 2 minutes
             }
         }
 
-        function updateDashboard(data) {
-            coins.forEach(coin => {
-                const coinData = data[coin];
-                if (!coinData) return;
-
-                const card = document.getElementById(coin);
+        function updateDashboard(dataArray) {
+            dataArray.forEach(data => {
+                const card = document.getElementById(data.symbol);
                 const priceEl = card.querySelector('.price');
                 const rsiEl = card.querySelector('.rsi');
                 const correctionEl = card.querySelector('.correction');
                 const statusEl = card.querySelector('.status');
 
-                priceEl.textContent = `$${coinData.current_price.toFixed(4)}`;
-                rsiEl.textContent = coinData.rsi_90.toFixed(2);
-                correctionEl.textContent = `${coinData.correction_percentage.toFixed(2)}%`;
+                priceEl.textContent = `$${data.currentPrice.toFixed(4)}`;
+                rsiEl.textContent = data.rsi90 ? data.rsi90.toFixed(2) : 'N/A';
+                correctionEl.textContent = `${data.correctionPercent.toFixed(2)}%`;
 
-                const rsiReady = coinData.rsi_90 < 30;
-                const correctionReady = coinData.correction_percentage >= 30;
+                const rsiReady = data.rsi90 && data.rsi90 < 30;
+                const correctionReady = data.correctionPercent >= 30;
                 const allReady = rsiReady && correctionReady;
 
-                statusEl.textContent = allReady ? '✓ READY (Awaiting Fear Sentiment)' : '✗ Not Ready';
+                statusEl.textContent = allReady ? '✓ READY (Awaiting Fear)' : '✗ Not Ready';
                 statusEl.className = allReady ? 'status ready' : 'status not-ready';
 
-                updateChart(coin, coinData.prices, coinData.current_price);
+                updateChart(data.symbol, data.prices, data.currentPrice);
             });
 
             document.getElementById('last-updated-time').textContent = new Date().toLocaleTimeString();
         }
 
-        function updateChart(coin, prices, currentPrice) {
-            const ctx = document.getElementById(`chart-${coin}`).getContext('2d');
+        function updateChart(symbol, prices, currentPrice) {
+            const ctx = document.getElementById(`chart-${symbol}`).getContext('2d');
             
-            if (charts[coin]) {
-                charts[coin].destroy();
+            if (charts[symbol]) {
+                charts[symbol].destroy();
             }
 
-            charts[coin] = new Chart(ctx, {
+            charts[symbol] = new Chart(ctx, {
                 type: 'line',
                 data: {
                     labels: prices.map((_, i) => `Day ${i + 1}`),
                     datasets: [{
-                        label: `${coin} Price (90 days)`,
+                        label: `${symbol} Price (90 days)`,
                         data: prices,
                         borderColor: '#007bff',
                         backgroundColor: 'rgba(0, 123, 255, 0.1)',
                         tension: 0.4,
-                        fill: true
+                        fill: true,
+                        pointRadius: 0
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: true }
+                        legend: { display: false }
                     },
                     scales: {
                         y: { beginAtZero: false }
@@ -230,7 +305,7 @@
             });
         }
 
-        // Fetch data every 2 minutes
+        // Fetch data immediately and every 2 minutes
         fetchCryptoData();
         setInterval(fetchCryptoData, 120000);
     </script>
