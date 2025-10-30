@@ -200,7 +200,7 @@
             return rsi;
         }
 
-        async let currentSentiment = 'Checking...';
+        let currentSentiment = 'Checking...';
 
 async function fetchSentiment() {
     try {
@@ -218,8 +218,15 @@ async function fetchSentiment() {
 }
 
 async function fetchCryptoData() {
-    const sentimentClassification = await fetchSentiment();
-            try {
+    let sentimentClassification = 'Checking...';
+    try {
+        sentimentClassification = await fetchSentiment();
+    } catch (e) {
+        console.error('Initial sentiment fetch failed, proceeding with crypto data:', e);
+        sentimentClassification = 'API Error';
+    }
+    
+    try {
                 const coinIds = Object.values(coins).join(',');
                 const response = await fetch(
                     `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinIds}&order=market_cap_desc&per_page=250&sparkline=false`
