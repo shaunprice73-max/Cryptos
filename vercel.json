@@ -1,7 +1,9 @@
 {
-  "buildCommand": "echo 'No build needed'",
-  "outputDirectory": "public",
+  "version": 2,
   "functions": {
+    "api/index.py": {
+      "runtime": "python3.9"
+    },
     "api/get-crypto-data.py": {
       "runtime": "python3.9"
     }
@@ -12,8 +14,8 @@
       "dest": "api/get-crypto-data.py"
     },
     {
-      "src": "/(?!api)(.*)",
-      "dest": "/index.html"
+      "src": "/(.*)",
+      "dest": "api/index.py"
     }
   ]
 }
