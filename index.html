@@ -200,7 +200,25 @@
             return rsi;
         }
 
-        async function fetchCryptoData() {
+        async let currentSentiment = 'Checking...';
+
+async function fetchSentiment() {
+    try {
+        const response = await fetch('https://api.alternative.me/fng/');
+        const data = await response.json();
+        const sentimentData = data.data[0];
+        currentSentiment = `${sentimentData.value_classification} (${sentimentData.value})`;
+        document.getElementById('sentiment-status').textContent = `Market Sentiment (Fear & Greed Index): ${currentSentiment}`;
+        return sentimentData.value_classification;
+    } catch (error) {
+        console.error('Error fetching sentiment data:', error);
+        document.getElementById('sentiment-status').textContent = `Market Sentiment (Fear & Greed Index): API Error`;
+        return 'API Error';
+    }
+}
+
+async function fetchCryptoData() {
+    const sentimentClassification = await fetchSentiment();
             try {
                 const coinIds = Object.values(coins).join(',');
                 const response = await fetch(
@@ -237,8 +255,8 @@
                     };
                 });
                 
-                const allData = await Promise.all(dataPromises);
-                updateDashboard(allData);
+                                const allData = await Promise.all(dataPromises);
+                updateDashboard(allData, sentimentClassification);
                 
             } catch (error) {
                 console.error('Error fetching crypto data:', error);
@@ -246,7 +264,7 @@
             }
         }
 
-        function updateDashboard(dataArray) {
+        function updateDashboard(dataArray, sentimentClassification) {
             dataArray.forEach(data => {
                 const card = document.getElementById(data.symbol);
                 const priceEl = card.querySelector('.price');
@@ -260,10 +278,19 @@
 
                 const rsiReady = data.rsi90 && data.rsi90 < 30;
                 const correctionReady = data.correctionPercent >= 30;
-                const allReady = rsiReady && correctionReady;
+                                const allReady = rsiReady && correctionReady;
+                const sentimentReady = sentimentClassification === 'Fear' || sentimentClassification === 'Extreme Fear';
 
-                statusEl.textContent = allReady ? '✓ READY (Awaiting Fear)' : '✗ Not Ready';
-                statusEl.className = allReady ? 'status ready' : 'status not-ready';
+                if (rsiReady && correctionReady && sentimentReady) {
+                    statusEl.textContent = '✅ ENTRY SIGNAL MET';
+                    statusEl.className = 'status ready';
+                } else if (rsiReady && correctionReady) {
+                    statusEl.textContent = `✓ READY (Awaiting ${sentimentReady ? 'N/A' : 'Fear'})`;
+                    statusEl.className = 'status wait';
+                } else {
+                    statusEl.textContent = '✗ Not Ready';
+                    statusEl.className = 'status not-ready';
+                }
 
                 updateChart(data.symbol, data.prices, data.currentPrice);
             });
