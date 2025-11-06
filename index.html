@@ -290,13 +290,10 @@ async function fetchCryptoData() {
                 const storedSignal = localStorage.getItem(STORAGE_KEY);
                 let signalTime = storedSignal ? parseInt(storedSignal) : null;
 
-                const allReady = rsiReady && correctionReady;
+                // const allReady = rsiReady && correctionReady; // Removed duplicate declaration
                 const sentimentReady = sentimentClassification === 'Fear' || sentimentClassification === 'Extreme Fear';
 
-                                const allReady = rsiReady && correctionReady;
-                const sentimentReady = sentimentClassification === 'Fear' || sentimentClassification === 'Extreme Fear';
-
-                // Check if the signal is currently met
+                                // Check if the signal is currently met
                 if (rsiReady && correctionReady && sentimentReady) {
                     // If signal is met, store the current time if not already stored or if the stored signal has expired
                     if (!signalTime || (Date.now() - signalTime > PERSISTENCE_WINDOW_MS)) {
