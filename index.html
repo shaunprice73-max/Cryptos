@@ -267,6 +267,8 @@ async function fetchCryptoData() {
                 
             } catch (error) {
                 console.error('Error fetching crypto data:', error);
+                // If crypto data fetch fails, still update the dashboard with partial data if available
+                updateDashboard([], sentimentClassification);
                 setTimeout(fetchCryptoData, 120000); // Retry after 2 minutes
             }
         }
