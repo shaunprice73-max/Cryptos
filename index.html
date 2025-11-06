@@ -106,7 +106,7 @@
 <body>
     <div class="container">
         <h1>Grand Monarch Investments Pty - Crypto Entry Monitor</h1>
-        <p>Monitoring XRP, UNI, SOL, and LINK for optimal entry (RSI < 30, >30% Correction, Fear Sentiment)</p>
+        <p>Monitoring XRP, UNI, SOL, and LINK for optimal entry (RSI (14-Day) < 30, >30% Correction, Fear Sentiment)</p>
         
         <div class="card-container">
             <div class="crypto-card" id="XRP">
@@ -236,28 +236,28 @@ async function fetchCryptoData() {
                 // Fetch 90-day historical data for each coin
                 const dataPromises = Object.entries(coins).map(async ([symbol, id]) => {
                     const histResponse = await fetch(
-                        `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=90`
+                        `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=30`
                     );
                     const histData = await histResponse.json();
                     const prices = histData.prices.map(p => p[1]);
                     
-                    // Find current price from market data
+// Find current price from market data
                     const current = marketData.find(m => m.id === id);
                     const currentPrice = current.current_price;
                     
-                    // Calculate 90-day peak
+                    // Calculate 30-day peak
                     const peak = Math.max(...prices);
                     const correctionPercent = ((peak - currentPrice) / peak) * 100;
                     
-                    // Calculate 90-day RSI
-                    const rsi90 = calculateRSI(prices, 14);
+                    // Calculate 14-day RSI
+                    const rsi14 = calculateRSI(prices, 14);
                     
                     return {
                         symbol,
                         currentPrice,
                         peak,
                         correctionPercent,
-                        rsi90,
+                        rsi14,
                         prices
                     };
                 });
@@ -280,21 +280,49 @@ async function fetchCryptoData() {
                 const statusEl = card.querySelector('.status');
 
                 priceEl.textContent = `$${data.currentPrice.toFixed(4)}`;
-                rsiEl.textContent = data.rsi90 ? data.rsi90.toFixed(2) : 'N/A';
+                rsiEl.textContent = data.rsi14 ? data.rsi14.toFixed(2) : 'N/A';
                 correctionEl.textContent = `${data.correctionPercent.toFixed(2)}%`;
 
-                const rsiReady = data.rsi90 && data.rsi90 < 30;
+                const rsiReady = data.rsi14 && data.rsi14 < 30;
                 const correctionReady = data.correctionPercent >= 30;
+                                const PERSISTENCE_WINDOW_MS = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+                const STORAGE_KEY = `entrySignalMet_${data.symbol}`;
+                const storedSignal = localStorage.getItem(STORAGE_KEY);
+                let signalTime = storedSignal ? parseInt(storedSignal) : null;
+
+                const allReady = rsiReady && correctionReady;
+                const sentimentReady = sentimentClassification === 'Fear' || sentimentClassification === 'Extreme Fear';
+
                                 const allReady = rsiReady && correctionReady;
                 const sentimentReady = sentimentClassification === 'Fear' || sentimentClassification === 'Extreme Fear';
 
+                // Check if the signal is currently met
                 if (rsiReady && correctionReady && sentimentReady) {
-                    statusEl.textContent = '✅ ENTRY SIGNAL MET';
+                    // If signal is met, store the current time if not already stored or if the stored signal has expired
+                    if (!signalTime || (Date.now() - signalTime > PERSISTENCE_WINDOW_MS)) {
+                        signalTime = Date.now();
+                        localStorage.setItem(STORAGE_KEY, signalTime.toString());
+                    }
+                } else {
+                    // If signal is NOT met, clear the stored signal
+                    localStorage.removeItem(STORAGE_KEY);
+                    signalTime = null;
+                }
+
+                // Determine the final status based on persistence logic
+                if (signalTime && (Date.now() - signalTime <= PERSISTENCE_WINDOW_MS)) {
+                    // Signal is met and within the 24-hour window
+                    const timeRemaining = signalTime + PERSISTENCE_WINDOW_MS - Date.now();
+                    const hours = Math.floor(timeRemaining / (1000 * 60 * 60));
+                    const minutes = Math.floor((timeRemaining % (1000 * 60 * 60)) / (1000 * 60));
+                    statusEl.textContent = `✅ ENTRY SIGNAL MET (Expires in ${hours}h ${minutes}m)`;
                     statusEl.className = 'status ready';
                 } else if (rsiReady && correctionReady) {
+                    // Technical conditions met, awaiting sentiment
                     statusEl.textContent = `✓ READY (Awaiting ${sentimentReady ? 'N/A' : 'Fear'})`;
                     statusEl.className = 'status wait';
                 } else {
+                    // Not ready
                     statusEl.textContent = '✗ Not Ready';
                     statusEl.className = 'status not-ready';
                 }
