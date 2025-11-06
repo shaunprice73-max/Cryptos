@@ -231,6 +231,9 @@ async function fetchCryptoData() {
                 const response = await fetch(
                     `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${coinIds}&order=market_cap_desc&per_page=250&sparkline=false`
                 );
+                if (!response.ok) {
+                    throw new Error(`CoinGecko Market Data API failed with status: ${response.status}`);
+                }
                 const marketData = await response.json();
                 
                 // Fetch 90-day historical data for each coin
@@ -238,6 +241,9 @@ async function fetchCryptoData() {
                     const histResponse = await fetch(
                         `https://api.coingecko.com/api/v3/coins/${id}/market_chart?vs_currency=usd&days=30`
                     );
+                    if (!histResponse.ok) {
+                        throw new Error(`CoinGecko Historical Data API for ${id} failed with status: ${histResponse.status}`);
+                    }
                     const histData = await histResponse.json();
                     const prices = histData.prices.map(p => p[1]);
                     
@@ -266,7 +272,7 @@ async function fetchCryptoData() {
                 updateDashboard(allData, sentimentClassification);
                 
             } catch (error) {
-                console.error('Error fetching crypto data:', error);
+                console.error('Error fetching crypto data:', error.message || error);
                 // If crypto data fetch fails, still update the dashboard with partial data if available
                 updateDashboard([], sentimentClassification);
                 setTimeout(fetchCryptoData, 120000); // Retry after 2 minutes
